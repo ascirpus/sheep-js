@@ -1,180 +1,119 @@
+class Position {
 
+    constructor(sheep, floors) {
+        this.sheep = sheep;
+        this.floors = document.querySelectorAll(floors);
 
-var Position = function Position(sheep, floors) {
+        this.stepTimeout = null;
+        this.lastStepTime = null;
+        this.animationTimeout = null;
+        this.lastAnimTime = null;
+        this.resumeTmt = null;
+        this.x = 0;
+        this.y = 0;
+        this.floor = null;
+        this.floorY = 0;
+        this.bounding = { left: 0, right: 0 };
+        this.onAnimationComplete = null;
 
-    var self    = this;
+        this._stepDelegate = this.step.bind(this);
+        this._resizeDelegate = this.onWindowResize.bind(this);
+        this._scrollDelegate = this.onScroll.bind(this);
 
-    self.sheep  = sheep;
+        mixinEvents(this);
 
-    self.floors         = document.querySelectorAll(floors);
-    self.stepDelegate   = bind(self.step, self);
-    self.resizeDelegate = bind(self.onWindowResize, self);
-    self.scrollDelegate = bind(self.onScroll, self);
+        const action = this.sheep.getAction();
 
-    self._observable    = new MetaphorJs.lib.Observable;
-    extend(self, self._observable.getApi());
+        sheep.on("tick", this.onTick, this);
+        action.on("run", this.onActionRun, this);
+        action.on("stop", this.onActionStop, this);
+        action.on("step", this.onActionStep, this);
 
-    var action = self.sheep.getAction();
+        window.addEventListener("resize", this._resizeDelegate, false);
+        window.addEventListener("scroll", this._scrollDelegate, false);
+    }
 
-    sheep.on("tick", self.onTick, self);
-
-    action.on("run", self.onActionRun, self);
-    action.on("stop", self.onActionStop, self);
-    action.on("step", self.onActionStep, self);
-
-    addListener(window, "resize", self.resizeDelegate);
-    addListener(window, "scroll", self.scrollDelegate);
-};
-
-extend(Position.prototype, {
-
-    stepTimeout: null,
-    lastStepTime: null,
-
-    animationTimeout: null,
-    lastAnimTime: null,
-
-    resumeTmt: null,
-
-
-    floors: null,
-    sheep: null,
-    x: 0,
-    y: 0,
-    floor: null,
-    floorY: 0,
-    bounding: {
-        left: 0,
-        right: 0
-    },
-
-    setFloor: function(el) {
-        var self    = this;
-        self.floor  = el;
-
+    setFloor(el) {
+        this.floor = el;
         if (el) {
-            self.bounding = getClientRect(el);
-            self.floorY = self.bounding.floor;
+            this.bounding = getClientRect(el);
+            this.floorY = this.bounding.floor;
         }
-    },
+    }
 
-    getFloor: function() {
-        return this.floor;
-    },
+    getFloor() { return this.floor; }
 
-    onTick: function(tickTime) {
-
-        var self = this;
-
-        if (self.stepTimeout && self.lastStepTime &&
-            tickTime - self.lastStepTime > self.stepTimeout) {
-
-            self.lastStepTime = tickTime;
-            self.step();
+    onTick(tickTime) {
+        if (this.stepTimeout && this.lastStepTime &&
+            tickTime - this.lastStepTime > this.stepTimeout) {
+            this.lastStepTime = tickTime;
+            this.step();
         }
 
-        if (self.animationTimeout && self.lastAnimTime &&
-            tickTime - self.lastAnimTime > self.animationTimeout) {
-
-            self.lastAnimTime = tickTime;
-            self.animationStep(tickTime);
+        if (this.animationTimeout && this.lastAnimTime &&
+            tickTime - this.lastAnimTime > this.animationTimeout) {
+            this.lastAnimTime = tickTime;
+            this.animationStep(tickTime);
         }
-    },
+    }
 
-    step: function() {
+    step() {
+        const action = this.sheep.getAction();
+        const dir = this.sheep.getDirection();
+        let xShift = action.xShift;
 
-        var self    = this,
-            action  = self.sheep.getAction(),
-            dir     = self.sheep.getDirection(),
-            xShift  = action.xShift,
-            yShift  = action.yShift,
-            bounding    = false;
-
-        if (dir == "l") {
-            xShift  *= -1;
+        if (dir === "l") {
+            xShift *= -1;
         }
 
-        self.x      = self.x + xShift;
+        this.x += xShift;
+        this.updatePosition();
 
-        self.updatePosition();
-
-        if (self.isOnBounding()) {
-            if (dir == "l") {
-                self.x = self.bounding.left;
-            }
-            else {
-                self.x = self.bounding.right - SIZE;
-            }
-            self.updatePosition();
-            self.stop();
-            self.trigger("bounding");
+        if (this.isOnBounding()) {
+            this.x = dir === "l" ? this.bounding.left : this.bounding.right - SIZE;
+            this.updatePosition();
+            this.stop();
+            this.trigger("bounding");
         }
-    },
+    }
 
-    isOnBounding: function(edge) {
-        var self    = this,
-            dir     = edge || self.sheep.getDirection();
-
-        if (dir == "l" && self.x <= self.bounding.left) {
-            return true;
-        }
-        else if (dir == "r" && self.x + SIZE >= self.bounding.right) {
-            return true;
-        }
+    isOnBounding(edge) {
+        const dir = edge || this.sheep.getDirection();
+        if (dir === "l" && this.x <= this.bounding.left) return true;
+        if (dir === "r" && this.x + SIZE >= this.bounding.right) return true;
         return false;
-    },
+    }
 
-    set: function(x, y) {
-        var self = this;
-        self.x = x;
-        self.y = y;
-        self.updatePosition();
-    },
-
-    addX: function(value) {
-        this.x += value;
+    set(x, y) {
+        this.x = x;
+        this.y = y;
         this.updatePosition();
-    },
+    }
 
-    addY: function(value) {
-        this.y += value;
-        this.updatePosition();
-    },
+    addX(value) { this.x += value; this.updatePosition(); }
+    addY(value) { this.y += value; this.updatePosition(); }
+    getX() { return this.x; }
+    getY() { return this.y; }
 
-    getX: function() {
-        return this.x;
-    },
+    updatePosition() {
+        const style = this.sheep.getElem().style;
+        style.left = `${this.x}px`;
+        style.top = `${this.y}px`;
+    }
 
-    getY: function() {
-        return this.y;
-    },
-
-    updatePosition: function() {
-        var self    = this,
-            el      = self.sheep.getElem(),
-            style   = el.style;
-
-        style.left  = self.x + 'px';
-        style.top   = self.y + 'px';
-    },
-
-    onActionRun: function(action) {
-
-        var self    = this;
-
+    onActionRun(action) {
         if (action.moveItv) {
-            self.lastStepTime = (new Date).getTime();
-            self.stepTimeout = action.moveItv;
+            this.lastStepTime = Date.now();
+            this.stepTimeout = action.moveItv;
         }
-    },
+    }
 
-    onActionStop: function() {
+    onActionStop() {
         this.stop();
-    },
+    }
 
-    onActionStep: function(action, frame) {
-
-        if (typeof frame != "number") {
+    onActionStep(action, frame) {
+        if (typeof frame !== "number") {
             if (frame.moveItv) {
                 action.xShift = frame.xShift;
                 action.yShift = frame.yShift;
@@ -185,216 +124,133 @@ extend(Position.prototype, {
                 this.stop();
             }
         }
-    },
+    }
 
-    stop: function() {
+    stop() {
         this.stepTimeout = null;
         this.lastStepTime = null;
-    },
+    }
 
+    animateTo(toX, toY, duration, easing, cb, scope) {
+        const start = Date.now();
+        const startX = this.x;
+        const startY = this.y;
+        const xLen = toX - startX;
+        const yLen = toY - startY;
 
-    animateTo: function(toX, toY, duration, easing, cb, scope) {
-
-        var self    = this,
-            start   = (new Date).getTime(),
-            startX  = self.x,
-            startY  = self.y,
-            xLen    = toX - startX,
-            yLen    = toY - startY,
-            xEasing,
-            yEasing;
-
+        let xEasing, yEasing;
         if (!easing) {
             xEasing = yEasing = easings.linear;
-        }
-        else {
-            if (isArray(easing)) {
-                xEasing = easing[0];
-                yEasing = easing[1];
-            }
-            else {
-                xEasing = yEasing = easing;
-            }
+        } else if (Array.isArray(easing)) {
+            xEasing = easing[0];
+            yEasing = easing[1];
+        } else {
+            xEasing = yEasing = easing;
         }
 
-        self.lastAnimTime = start;
-        self.animationTimeout = 40;
+        this.lastAnimTime = start;
+        this.animationTimeout = 40;
 
-        self.animationStep    = function(tickTime) {
+        this.animationStep = (tickTime) => {
+            let time = tickTime - start;
+            if (time > duration) time = duration;
 
-            var time = tickTime - start;
+            this.x = startX + xEasing(time, 0, xLen, duration);
+            this.y = startY + yEasing(time, 0, yLen, duration);
 
-            if (time > duration) {
-                time = duration;
+            if (this.sheep.getAction().bound) {
+                this.x = Math.max(this.bounding.left, Math.min(this.x, this.bounding.right - SIZE));
             }
 
-            self.x  = startX + xEasing(time, 0, xLen, duration);
-            self.y  = startY + yEasing(time, 0, yLen, duration);
+            this.updatePosition();
 
-            if (self.sheep.getAction().bound) {
-                if (self.x < self.bounding.left) {
-                    self.x = self.bounding.left;
+            if (time === duration) {
+                if (cb) cb.call(scope || this.sheep);
+                if (this.onAnimationComplete) {
+                    this.onAnimationComplete();
+                    this.onAnimationComplete = null;
                 }
-                if (self.x > self.bounding.right - SIZE) {
-                    self.x = self.bounding.right - SIZE;
-                }
-            }
-
-            self.updatePosition();
-
-            if (time == duration) {
-                if (cb) {
-                    cb.call(scope || self.sheep);
-                }
-                if (self.onAnimationComplete) {
-                    self.onAnimationComplete();
-                    self.onAnimationComplete = null;
-                }
-                self.stopAnimation();
+                this.stopAnimation();
             }
         };
-    },
+    }
 
-    stopAnimation: function() {
+    stopAnimation() {
         this.animationTimeout = null;
-    },
+    }
 
+    onWindowResize() { this.adjustToWindow(); }
+    onScroll() { this.adjustToWindow(); }
 
-    onWindowResize: function() {
-        this.adjustToWindow();
-    },
+    adjustToWindow() {
+        const rect = getClientRect(window);
 
-    onScroll: function() {
-        this.adjustToWindow();
-    },
-
-    adjustToWindow: function() {
-        var self    = this,
-            rect    = getClientRect(window);
-
-        if (self.resumeTmt) {
-            window.clearTimeout(self.resumeTmt);
+        if (this.resumeTmt) {
+            clearTimeout(this.resumeTmt);
         }
 
-        if (self.y + SIZE > rect.floor) {
+        if (this.y + SIZE > rect.floor) {
+            this.setFloor(window);
+            this.stopAnimation();
+            this.sheep.stop();
+            this.sheep.setFrame(23);
 
-            self.setFloor(window);
+            this.floorY = rect.floor;
+            this.y = this.floorY - SIZE;
+            this.updatePosition();
 
-            self.stopAnimation();
-            self.sheep.stop();
-            self.sheep.setFrame(23);
-
-            self.floorY = rect.floor;
-            self.y = self.floorY - SIZE;
-            self.updatePosition();
-
-            self.resumeTmt = window.setTimeout(function(){
-                self.sheep.start();
-            }, 2000);
-        }
-        else if (self.y + SIZE < rect.floor && self.floor === window) {
-            self.setFloor(window);
-            self.sheep.stop();
-            self.sheep.setFrame(47);
-            self.floorY = rect.floor;
-            self.animateTo(self.x, self.floorY - SIZE, 1000, easings.easeInQuad);
-            self.onAnimationComplete = function() {
-                self.sheep.setFrame(85);
-                self.resumeTmt = window.setTimeout(function(){
-                    self.sheep.start();
-                }, 2000);
+            this.resumeTmt = setTimeout(() => this.sheep.start(), 2000);
+        } else if (this.y + SIZE < rect.floor && this.floor === window) {
+            this.setFloor(window);
+            this.sheep.stop();
+            this.sheep.setFrame(47);
+            this.floorY = rect.floor;
+            this.animateTo(this.x, this.floorY - SIZE, 1000, easings.easeInQuad);
+            this.onAnimationComplete = () => {
+                this.sheep.setFrame(85);
+                this.resumeTmt = setTimeout(() => this.sheep.start(), 2000);
             };
+        } else if (!this.sheep.auto) {
+            this.resumeTmt = setTimeout(() => this.sheep.start(), 1000);
         }
-        else {
-            if (!self.sheep.auto) {
-                self.resumeTmt = window.setTimeout(function(){
-                    self.sheep.start();
-                }, 1000);
-            }
-        }
-    },
+    }
 
-
-    findUpperFloor: function() {
+    findUpperFloor() {
         return this.findFloor("upper", null);
-    },
+    }
 
-    findLowerFloor: function() {
+    findLowerFloor() {
         return this.findFloor("lower", window);
-    },
+    }
 
-    findFloor: function(which, def) {
+    findFloor(which, def) {
+        const found = [];
 
-        var self    = this,
-            fls     = self.floors,
-            i, len,
-            rect,
-            f,
-            found   = [];
+        for (const f of this.floors) {
+            if (f === this.floor || f === window || !isReachable(f)) continue;
 
-        for (i = 0, len = fls.length; i < len; i++) {
-
-            f = fls[i];
-
-            if (f === self.floor || f === window || !isReachable(f)) {
-                continue;
-            }
-
-            rect = getClientRect(f);
-
-            if (which == "upper" && rect.floor >= self.floorY) {
-                continue;
-            }
-
-            if (which == "lower" && rect.floor <= self.floorY) {
-                continue;
-            }
+            const rect = getClientRect(f);
+            if (which === "upper" && rect.floor >= this.floorY) continue;
+            if (which === "lower" && rect.floor <= this.floorY) continue;
 
             found.push(f);
         }
 
         if (found.length) {
-            if (def) {
-                found.push(def);
-            }
+            if (def) found.push(def);
             return found.length > 1 ? found[getRandomInt(0, found.length)] : found[0];
         }
-        else {
-            return def;
-        }
-    },
-
-
-    findFloorBeneath: function() {
-
-        var self    = this,
-            fls     = self.floors,
-            x       = self.x,
-            y       = self.y,
-            i, len,
-            rect,
-            f;
-
-        for (i = 0, len = fls.length; i < len; i++) {
-
-            f = fls[i];
-
-            if (f === self.floor || f === window || !isReachable(f)) {
-                continue;
-            }
-
-            rect = getClientRect(f);
-
-            if (rect.floor <= y + SIZE) {
-                continue;
-            }
-
-            if (rect.left < x && rect.right > x) {
-                return f;
-            }
-        }
-
-        return window;
+        return def;
     }
 
-});
+    findFloorBeneath() {
+        for (const f of this.floors) {
+            if (f === this.floor || f === window || !isReachable(f)) continue;
+
+            const rect = getClientRect(f);
+            if (rect.floor <= this.y + SIZE) continue;
+            if (rect.left < this.x && rect.right > this.x) return f;
+        }
+        return window;
+    }
+}

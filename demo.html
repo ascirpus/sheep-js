@@ -2,34 +2,22 @@
 <html>
 <head>
     <title>Sheep</title>
-    <script src="../observable/metaphorjs.observable.js"></script>
-    <!--<script src="src/Sheep.js"></script>
-    <script src="src/Position.js"></script>
-    <script src="src/Actions.js"></script>
-    <script src="src/Action.js"></script>
+    <script src="src/Sheep.js"></script>
     <script src="src/Easing.js"></script>
-    -->
-    <script src="build/sheep.min.js"></script>
+    <script src="src/Action.js"></script>
+    <script src="src/Actions.js"></script>
+    <script src="src/Position.js"></script>
     <script>
+        let sheep;
 
-        var sheep;
-
-        var addSheep = function() {
-            var sh = new Sheep({
+        const addSheep = () => {
+            const sh = new Sheep({
                 floors: "window, .floor"
             });
-
-            if (!sheep) {
-                sheep = sh;
-            }
+            if (!sheep) sheep = sh;
         };
 
-        window.setTimeout(function(){
-            addSheep();
-        }, 500);
-
-
-
+        setTimeout(() => addSheep(), 500);
     </script>
 
     <style>

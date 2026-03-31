@@ -1,6 +1,4 @@
-
-
-var allActionProps = {
+const allActionProps = {
     frames: [1],
     frameItv: null,
     xShift: 0,
@@ -15,146 +13,121 @@ var allActionProps = {
     onlyAfter: null,
     nextAction: null,
     probability: null,
-    onStep: function() {},
-    onStop: function() {},
-    onEnd: function() {},
-    isPossible: function(sheep) {},
-    beforeStart: function(){}
+    onStep() {},
+    onStop() {},
+    onEnd() {},
+    isPossible(sheep) {},
+    beforeStart() {}
 };
 
 
-var Action = function Action(sheep) {
+class Action {
 
-    var self    = this;
-    self._sheep = sheep;
-    self._sheep.on("tick", self.onTick, self);
+    constructor(sheep) {
+        this._sheep = sheep;
+        this._sheep.on("tick", this.onTick, this);
 
-    self._observable    = new MetaphorJs.lib.Observable;
-    extend(self, self._observable.getApi());
+        this._id = null;
+        this._currentFrame = -1;
+        this._startTime = null;
+        this._lastTime = null;
+        this._timeout = null;
 
-    sheep.on("init", function() {
-        sheep.getPosition().on("bounding", self.onBounding, self);
-    });
-};
+        mixinEvents(this);
 
-extend(Action.prototype, {
+        sheep.on("init", () => {
+            sheep.getPosition().on("bounding", this.onBounding, this);
+        });
+    }
 
-    _id: null,
-    _sheep: null,
-    _observable: null,
-    _currentFrame: -1,
-    _startTime: null,
-    _lastTime: null,
-    _timeout: null,
+    setup(props, id) {
+        Object.assign(this, allActionProps, props);
+        this._id = id;
+    }
 
-    setup: function(props, id) {
-        var self = this;
-        extend(self, allActionProps);
-        extend(self, props);
-        self._id = id;
-    },
+    run() {
+        this._currentFrame = -1;
+        this._startTime = Date.now();
+        this._lastTime = this._startTime;
 
-    run: function() {
-        var self    = this;
-        self._currentFrame = -1;
-        self._startTime = (new Date).getTime();
-        self._lastTime = self._startTime;
-
-        if (self.frameItv) {
-            self._timeout = self.frameItv;
+        if (this.frameItv) {
+            this._timeout = this.frameItv;
         }
 
-        self.beforeStart();
-        self.step(self._startTime);
-        self.trigger("run", self);
+        this.beforeStart();
+        this.step(this._startTime);
+        this.trigger("run", this);
 
-        if (self.loop && !self.duration) {
-            self.duration = getRandomInt(self.minDuration, self.maxDuration) * 1000;
+        if (this.loop && !this.duration) {
+            this.duration = getRandomInt(this.minDuration, this.maxDuration) * 1000;
         }
-    },
+    }
 
-    stop: function() {
-
-        var self    = this;
-
-        if (self._timeout) {
-            self._timeout = null;
-            self.onStop();
-            self.trigger("stop", self);
+    stop() {
+        if (this._timeout) {
+            this._timeout = null;
+            this.onStop();
+            this.trigger("stop", this);
         }
-    },
+    }
 
-    end: function() {
-        var self = this;
-        self.stop();
-        self.onEnd();
-        self.trigger("end", self);
-    },
+    end() {
+        this.stop();
+        this.onEnd();
+        this.trigger("end", this);
+    }
 
-    onEnd: function() {},
-
-
-    onTick: function(tickTime) {
-
-        var self    = this;
-
-        if (self._timeout && self._lastTime && tickTime - self._lastTime > self._timeout) {
-            self._lastTime = tickTime;
-            self.step(tickTime);
+    onTick(tickTime) {
+        if (this._timeout && this._lastTime && tickTime - this._lastTime > this._timeout) {
+            this._lastTime = tickTime;
+            this.step(tickTime);
         }
-    },
+    }
 
-    step: function(tickTime) {
+    step(tickTime) {
+        const l = this.frames.length;
+        let curr = this._currentFrame;
 
-        var self    = this,
-            l       = self.frames.length,
-            curr    = self._currentFrame,
-            frame;
-
-        if (self.duration && tickTime - self._startTime > self.duration) {
-            self.end();
+        if (this.duration && tickTime - this._startTime > this.duration) {
+            this.end();
             return;
         }
 
         curr++;
-        if (curr == l) {
-            if (self.loop) {
+        if (curr === l) {
+            if (this.loop) {
                 curr = 0;
-            }
-            else {
-                self.end();
+            } else {
+                this.end();
                 return;
             }
         }
 
-        self._currentFrame = curr;
-        frame = self.frames[curr];
+        this._currentFrame = curr;
+        const frame = this.frames[curr];
 
-        if (typeof frame == "number") {
-            self._timeout = self.frameItv;
-            self._sheep.setFrame(self.frames[curr]);
-        }
-        else {
+        if (typeof frame === "number") {
+            this._timeout = this.frameItv;
+            this._sheep.setFrame(this.frames[curr]);
+        } else {
             if (frame.frameItv) {
-                self.frameItv = frame.frameItv;
+                this.frameItv = frame.frameItv;
             }
-            self._timeout = frame.duration || self.frameItv;
-            self._sheep.setFrame(frame.frame);
+            this._timeout = frame.duration || this.frameItv;
+            this._sheep.setFrame(frame.frame);
 
             if (frame.action) {
-                frame.action.call(self);
+                frame.action.call(this);
             }
         }
 
-        self.onStep(curr, frame);
-        self.trigger("step", self, frame);
-    },
-
-    onBounding: function() {
-        var self = this;
-        if (self.bound) {
-            self.end();
-        }
+        this.onStep(curr, frame);
+        this.trigger("step", this, frame);
     }
 
-});
+    onBounding() {
+        if (this.bound) {
+            this.end();
+        }
+    }
+}

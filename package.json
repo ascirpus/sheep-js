@@ -1,0 +1,23 @@
+{
+  "name": "sheep",
+  "version": "1.0.0",
+  "description": "Javascript implementation of sheep.exe ((c) Tatsutoshi Nomura)",
+  "main": "index.js",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kuindji/sheep-js.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kuindji/sheep-js/issues"
+  },
+  "homepage": "https://github.com/kuindji/sheep-js#readme",
+  "devDependencies": {
+    "esbuild": "^0.27.4"
+  }
+}
